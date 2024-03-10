@@ -1,0 +1,5 @@
+dbConfig:
+  user: "postgres"
+  password: "liza"
+  dbName: "ordersdb"
+  sslmode: "disable"
