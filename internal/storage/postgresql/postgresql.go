@@ -30,13 +30,7 @@ func (s *Storage) Ping() error {
 
 func (s *Storage) GetOrder(orderUid string) (*storage.Order, error) {
 	const op = "storage.postrgesql.getOrder"
-	result := s.db.QueryRow(`
-	SELECT * 
-	FROM orders 
-	JOIN delivery ON orders.delivery = delivery.uid
-	JOIN payment ON orders.order_uid = payment.transact
-	JOIN items ON orders.track_number = items.track_number
-	WHERE orders.order_uid = $1`, orderUid)
+	result := s.db.QueryRow(getTemplate, orderUid)
 
 	order, err := ParseOrder(result)
 	if err != nil {
@@ -44,6 +38,51 @@ func (s *Storage) GetOrder(orderUid string) (*storage.Order, error) {
 		return nil, err
 	}
 	return order, nil
+}
+
+func (s *Storage) SaveOrder(order *storage.Order) error {
+	const op = "storage.postgresql.CreateOrder"
+
+	_, err := s.db.Exec(saveOrder,
+		order.OrderID, order.TrackNum, order.Entry, order.Locale,
+		order.InternalSignature, order.CustomerId, order.DeliveryService,
+		order.Shardkey, order.SmId, order.DateCreated, order.OofShard,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: order: %w", op, err)
+	}
+
+	_, err = s.db.Exec(saveDelivery,
+		order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
+		order.Delivery.City, order.Delivery.Address, order.Delivery.Region,
+		order.Delivery.Email,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: delivery: %w", op, err)
+	}
+
+	_, err = s.db.Exec(savePayment,
+		order.Payment.Transaction, order.Payment.ReqID, order.Payment.Currency,
+		order.Payment.Provider, order.Payment.Amount, order.Payment.PaymentDt,
+		order.Payment.Bank, order.Payment.DeliveryCost, order.Payment.GoodsTotal,
+		order.Payment.CustomFee,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: payment: %w", op, err)
+	}
+
+	_, err = s.db.Exec(saveItems,
+		order.Items.ChrtID, order.Items.TrackNumber, order.Items.Price,
+		order.Items.Rid, order.Items.Name, order.Items.Sale, order.Items.Size,
+		order.Items.TotalPrice, order.Items.NmID, order.Items.Brand,
+		order.Items.Status,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: order: %w", op, err)
+	}
+
+	return nil
+
 }
 
 func ParseOrder(row *sql.Row) (*storage.Order, error) {
