@@ -2,13 +2,19 @@ package postgresql
 
 const (
 	getTemplate = `
-	SELECT * 
-	FROM orders 
-	JOIN delivery ON orders.delivery = delivery.uid
-	JOIN payment ON orders.order_uid = payment.transact
-	JOIN items ON orders.track_number = items.track_number
-	WHERE orders.order_uid = $1
-	`
+SELECT o.order_uid, o.track_number, o.entry, o.locale, o.internal_signature, 
+	o.customer_id, o.delivery_service, o.shardkey, o.sm_id, 
+		o.date_created, o.oof_shard, 
+	d.fio, d.phone, d.zip, d.city, d.address, d.region, d.email,
+	pa.request_id, pa.currency, pa.provider, pa.amount, pa.payment_dt, pa.bank,
+		pa.delivery_cost, pa.goods_total, pa.custom_fee,
+	i.chrt_id, i.price, i.rid, i.iname, i.sale, i.isize, i.total_price, i.nm_id,
+	i.brand, i.status
+FROM orders o  
+JOIN delivery d ON o.track_number = d.track_number
+JOIN payment pa ON o.order_uid = pa.transact
+JOIN items i ON o.track_number = i.track_number
+`
 
 	saveOrder = `
 INSERT INTO orders(
@@ -40,7 +46,8 @@ VALUES (
 
 	saveDelivery = `
 INSERT INTO delivery(
-	fio,
+	track_number,
+    fio,
 	phone,
 	zip,
 	city,
@@ -55,7 +62,8 @@ VALUES (
 	$4,
 	$5,
 	$6,
-	$7
+	$7,
+    $8
 );
 `
 

@@ -24,6 +24,10 @@ func New(config config.DbConfig) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
+func (s *Storage) Close() error {
+	return s.db.Close()
+}
+
 func (s *Storage) Ping() error {
 	return s.db.Ping()
 }
@@ -53,7 +57,7 @@ func (s *Storage) SaveOrder(order *storage.Order) error {
 	}
 
 	_, err = s.db.Exec(saveDelivery,
-		order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
+		order.TrackNum, order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
 		order.Delivery.City, order.Delivery.Address, order.Delivery.Region,
 		order.Delivery.Email,
 	)
@@ -78,7 +82,7 @@ func (s *Storage) SaveOrder(order *storage.Order) error {
 		order.Items.Status,
 	)
 	if err != nil {
-		return fmt.Errorf("%s: order: %w", op, err)
+		return fmt.Errorf("%s: items: %w", op, err)
 	}
 
 	return nil
@@ -87,27 +91,29 @@ func (s *Storage) SaveOrder(order *storage.Order) error {
 
 func ParseOrder(row *sql.Row) (*storage.Order, error) {
 	var order storage.Order
-	var emptyStuff byte
 	err := row.Scan( // Common order Info
 		&order.OrderID, &order.TrackNum, &order.Entry,
-		&emptyStuff, &order.Locale, &order.InternalSignature,
+		&order.Locale, &order.InternalSignature,
 		&order.CustomerId, &order.DeliveryService,
 		&order.Shardkey, &order.SmId, &order.DateCreated, &order.OofShard,
 		//Delivery
-		&emptyStuff, &order.Delivery.Name, &order.Delivery.Phone, &order.Delivery.Zip,
+		&order.Delivery.Name, &order.Delivery.Phone, &order.Delivery.Zip,
 		&order.Delivery.City, &order.Delivery.Address, &order.Delivery.Region,
 		&order.Delivery.Email,
 		//Payment
-		&order.Payment.Transaction, &order.Payment.ReqID,
+		&order.Payment.ReqID,
 		&order.Payment.Currency, &order.Payment.Provider, &order.Payment.Amount,
 		&order.Payment.PaymentDt, &order.Payment.Bank, &order.Payment.DeliveryCost,
 		&order.Payment.GoodsTotal, &order.Payment.CustomFee,
 		//Items
-		&order.Items.ChrtID, &order.Items.TrackNumber, &order.Items.Price,
+		&order.Items.ChrtID, &order.Items.Price,
 		&order.Items.Rid, &order.Items.Name, &order.Items.Sale, &order.Items.Size,
 		&order.Items.TotalPrice, &order.Items.NmID, &order.Items.Brand,
 		&order.Items.Status,
 	)
+
+	order.Items.TrackNumber = order.TrackNum
+	order.Payment.Transaction = order.OrderID
 
 	if err != nil {
 		return nil, err

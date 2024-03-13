@@ -5,10 +5,13 @@ import (
 	"github.com/joho/godotenv"
 	"log/slog"
 	"os"
+	"time"
 )
 
 type Config struct {
+	Nats     Nats     `yaml:"nats"`
 	DbConfig DbConfig `yaml:"dbConfig" env-required:"true"`
+	Server   Server   `yaml:"server"`
 }
 
 type DbConfig struct {
@@ -16,6 +19,16 @@ type DbConfig struct {
 	DbPass  string `yaml:"password" env-required:"true"`
 	DbName  string `yaml:"dbName" env-required:"true"`
 	SSLmode string `yaml:"sslmode"`
+}
+
+type Server struct {
+	Timeout     time.Duration `yaml:"timeout" env-default:"5s"`
+	IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"60s"`
+	Address     string        `yaml:"address" env-default:"localhost:8080"`
+}
+
+type Nats struct {
+	IpAddr string `yaml:"ipaddr"`
 }
 
 const op = "config.MustLoad: "

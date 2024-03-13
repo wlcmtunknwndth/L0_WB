@@ -6,20 +6,20 @@ import (
 )
 
 type Order struct {
-	OrderID           string    `json:"order_uid"`
-	TrackNum          string    `json:"track_number"`
-	Entry             string    `json:"WBIL"`
-	Delivery          Delivery  `json:"delivery"`
-	Payment           Payment   `json:"payment"`
-	Items             Items     `json:"items"`
-	Locale            string    `json:"locale"`
-	InternalSignature string    `json:"internal_signature"`
-	CustomerId        string    `json:"customer_id"`
-	DeliveryService   string    `json:"delivery_service"`
-	Shardkey          string    `json:"shardkey"`
-	SmId              uint32    `json:"sm_id"`
-	DateCreated       time.Time `json:"date_created"`
-	OofShard          string    `json:"oof_shard"`
+	OrderID           string    `json:"order_uid" protobuf:"order_uid"`
+	TrackNum          string    `json:"track_number" protobuf:"track_number"`
+	Entry             string    `json:"entry" protobuf:"WBIL"`
+	Delivery          Delivery  `json:"delivery" protobuf:"delivery"`
+	Payment           Payment   `json:"payment" protobuf:"payment"`
+	Items             Items     `json:"items" protobuf:"items"`
+	Locale            string    `json:"locale" protobuf:"locale"`
+	InternalSignature string    `json:"internal_signature" protobuf:"internal_signature"`
+	CustomerId        string    `json:"customer_id" protobuf:"customer_id"`
+	DeliveryService   string    `json:"delivery_service" protobuf:"delivery_service"`
+	Shardkey          string    `json:"shardkey" protobuf:"shardkey"`
+	SmId              uint32    `json:"sm_id" protobuf:"sm_id"`
+	DateCreated       time.Time `json:"date_created" protobuf:"date_created"`
+	OofShard          string    `json:"oof_shard" protobuf:"oof_shard"`
 }
 
 type Delivery struct {
@@ -50,7 +50,7 @@ type Items struct {
 	TrackNumber string `json:"track_number"`
 	Price       uint32 `json:"price"`
 	Rid         string `json:"rid"`
-	Name        string `json:"Mascaras"`
+	Name        string `json:"name"`
 	Sale        uint8  `json:"sale"`
 	Size        string `json:"size"`
 	TotalPrice  uint32 `json:"total_price"`
