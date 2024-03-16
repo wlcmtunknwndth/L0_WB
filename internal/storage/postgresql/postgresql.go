@@ -21,6 +21,11 @@ func New(config config.DbConfig) (*Storage, error) {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
+	if err = db.Ping(); err != nil {
+		slog.Error("couldn't ping db", err)
+	} else {
+		slog.Info("pinged db successfully")
+	}
 	return &Storage{db: db}, nil
 }
 
@@ -34,13 +39,22 @@ func (s *Storage) Ping() error {
 
 func (s *Storage) GetOrder(orderUid string) (*storage.Order, error) {
 	const op = "storage.postrgesql.getOrder"
-	result := s.db.QueryRow(getTemplate, orderUid)
+	result := s.db.QueryRow(getOrderTemplate, orderUid)
 
 	order, err := ParseOrder(result)
 	if err != nil {
 		slog.Error(op, "Couldn't get order: ", err)
 		return nil, err
 	}
+
+	res, err := s.db.Query(getItemsTemplate, order.TrackNum)
+
+	order.Items = *ParseItems(res)
+	if err != nil {
+		slog.Error(op, "Couldn't get items: ", err)
+		return nil, err
+	}
+
 	return order, nil
 }
 
@@ -75,14 +89,16 @@ func (s *Storage) SaveOrder(order *storage.Order) error {
 		return fmt.Errorf("%s: payment: %w", op, err)
 	}
 
-	_, err = s.db.Exec(saveItems,
-		order.Items.ChrtID, order.Items.TrackNumber, order.Items.Price,
-		order.Items.Rid, order.Items.Name, order.Items.Sale, order.Items.Size,
-		order.Items.TotalPrice, order.Items.NmID, order.Items.Brand,
-		order.Items.Status,
-	)
-	if err != nil {
-		return fmt.Errorf("%s: items: %w", op, err)
+	for i := 0; i < len(order.Items); i++ {
+		_, err = s.db.Exec(saveItems,
+			order.Items[i].ChrtID, order.Items[i].TrackNumber, order.Items[i].Price,
+			order.Items[i].Rid, order.Items[i].Name, order.Items[i].Sale, order.Items[i].Size,
+			order.Items[i].TotalPrice, order.Items[i].NmID, order.Items[i].Brand,
+			order.Items[i].Status,
+		)
+		if err != nil {
+			return fmt.Errorf("%s: items: %w", op, err)
+		}
 	}
 
 	return nil
@@ -105,85 +121,31 @@ func ParseOrder(row *sql.Row) (*storage.Order, error) {
 		&order.Payment.Currency, &order.Payment.Provider, &order.Payment.Amount,
 		&order.Payment.PaymentDt, &order.Payment.Bank, &order.Payment.DeliveryCost,
 		&order.Payment.GoodsTotal, &order.Payment.CustomFee,
-		//Items
-		&order.Items.ChrtID, &order.Items.Price,
-		&order.Items.Rid, &order.Items.Name, &order.Items.Sale, &order.Items.Size,
-		&order.Items.TotalPrice, &order.Items.NmID, &order.Items.Brand,
-		&order.Items.Status,
 	)
-
-	order.Items.TrackNumber = order.TrackNum
 	order.Payment.Transaction = order.OrderID
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing order: %w", err)
 	}
+
 	return &order, nil
 }
 
-/*
-DROP TABLE orders, delivery, items, payment;
+func ParseItems(row *sql.Rows) *[]storage.Item {
+	var items []storage.Item = make([]storage.Item, 0)
 
-CREATE TABLE IF NOT EXISTS orders
-(
-    order_uid  VARCHAR(128) PRIMARY KEY,
-    track_number  VARCHAR(128) UNIQUE,
-    entry  VARCHAR(64),
-    delivery  INT UNIQUE,
-    payment  VARCHAR(128) UNIQUE,
-    items  INT UNIQUE,
-    locale  VARCHAR(10),
-    internal_signature  VARCHAR(128),
-    customer_id  VARCHAR(128),
-    delivery_service  VARCHAR(128),
-    shardkey VARCHAR(64),
-    sm_id  INT,
-    date_created  timestamp,
-    oof_shard  VARCHAR(32)
-);
+	for row.Next() {
+		var item storage.Item
+		err := row.Scan(&item.ChrtID, &item.TrackNumber, &item.Price,
+			&item.Rid, &item.Name, &item.Sale, &item.Size,
+			&item.TotalPrice, &item.NmID, &item.Brand,
+			&item.Status)
+		if err != nil {
+			slog.Error("Error parsing item:", err)
+			return nil
+		}
+		items = append(items, item)
+	}
 
-CREATE TABLE IF NOT EXISTS delivery
-(
-	uuid INT PRIMARY KEY,
-	fio VARCHAR(64),
-	phone VARCHAR(16),
-	zip VARCHAR(16),
-	city VARCHAR(32),
-	address VARCHAR(64),
-	region VARCHAR(32),
-	email VARCHAR(128),
-	FOREIGN KEY (uuid) REFERENCES orders(delivery)
-);
-
-CREATE TABLE IF NOT EXISTS payment
-(
-	transact VARCHAR(128) UNIQUE,
-	request_id VARCHAR(128),
-	currency VARCHAR(8),
-	provider VARCHAR(32),
-	amount INT CHECK(delivery_cost > 0),
-	payment_dt INT CHECK(payment_dt > 0),
-	bank VARCHAR(32),
-	delivery_cost INT CHECK(delivery_cost > 0),
-	goods_total INT CHECK(goods_total > 0),
-	custom_fee INT CHECK(custom_fee > 0),
-	FOREIGN KEY (transact) REFERENCES orders(payment)
-);
-
-CREATE TABLE IF NOT EXISTS items
-(
-	chrt_id INT UNIQUE,
-	track_number VARCHAR(128) PRIMARY KEY,
-	price INT,
-	rid VARCHAR(64) UNIQUE,
-	iname VARCHAR(32),
-	sale INT CHECK (sale > 0),
-	isize VARCHAR(16),
-	total_price INT CHECK (total_price > 0),
-	nm_id INT CHECK (nm_id > 0),
-	brand VARCHAR(32),
-	status INT CHECK (status > 0),
-	FOREIGN KEY (track_number) REFERENCES orders(track_number)
-);
-
-*/
+	return &items
+}

@@ -11,7 +11,7 @@ type Order struct {
 	Entry             string    `json:"entry" protobuf:"WBIL"`
 	Delivery          Delivery  `json:"delivery" protobuf:"delivery"`
 	Payment           Payment   `json:"payment" protobuf:"payment"`
-	Items             Items     `json:"items" protobuf:"items"`
+	Items             []Item    `json:"items" protobuf:"items"`
 	Locale            string    `json:"locale" protobuf:"locale"`
 	InternalSignature string    `json:"internal_signature" protobuf:"internal_signature"`
 	CustomerId        string    `json:"customer_id" protobuf:"customer_id"`
@@ -45,7 +45,7 @@ type Payment struct {
 	CustomFee    uint16 `json:"custom_fee"`
 }
 
-type Items struct {
+type Item struct {
 	ChrtID      uint32 `json:"chrt_id"`
 	TrackNumber string `json:"track_number"`
 	Price       uint32 `json:"price"`
@@ -57,6 +57,10 @@ type Items struct {
 	NmID        uint32 `json:"nm_id"`
 	Brand       string `json:"brand"`
 	Status      uint8  `json:"status"`
+}
+
+type SearchRequest struct {
+	Uuid string `json:"order_uid"`
 }
 
 var banks = []string{"sber", "alpha", "raif", "tinkoff", "wtb", "rnkb"}
@@ -92,18 +96,33 @@ func RandomOrder(uuid string) *Order {
 			GoodsTotal:   gofakeit.Uint32(),
 			CustomFee:    gofakeit.Uint16(),
 		},
-		Items: Items{
-			ChrtID:      gofakeit.Uint32(),
-			TrackNumber: trackNum,
-			Price:       gofakeit.Uint32(),
-			Rid:         gofakeit.UUID(),
-			Name:        gofakeit.Name(),
-			Sale:        gofakeit.Uint8(),
-			Size:        gofakeit.HexUint8(),
-			TotalPrice:  gofakeit.Uint32(),
-			NmID:        gofakeit.Uint32(),
-			Brand:       gofakeit.Name(),
-			Status:      uint8(gofakeit.HTTPStatusCode()),
+		Items: []Item{
+			Item{
+				ChrtID:      gofakeit.Uint32(),
+				TrackNumber: trackNum,
+				Price:       uint32(gofakeit.IntRange(1, 10000000)),
+				Rid:         gofakeit.UUID(),
+				Name:        gofakeit.Name(),
+				Sale:        uint8(gofakeit.IntRange(1, 100)),
+				Size:        gofakeit.HexUint8(),
+				TotalPrice:  uint32(gofakeit.IntRange(1, 10000000)),
+				NmID:        uint32(gofakeit.IntRange(1, 100000)),
+				Brand:       gofakeit.Name(),
+				Status:      uint8(gofakeit.HTTPStatusCode()),
+			},
+			Item{
+				ChrtID:      gofakeit.Uint32(),
+				TrackNumber: trackNum,
+				Price:       uint32(gofakeit.IntRange(1, 10000000)),
+				Rid:         gofakeit.UUID(),
+				Name:        gofakeit.Name(),
+				Sale:        uint8(gofakeit.IntRange(1, 100)),
+				Size:        gofakeit.HexUint8(),
+				TotalPrice:  uint32(gofakeit.IntRange(1, 10000000)),
+				NmID:        uint32(gofakeit.IntRange(1, 100000)),
+				Brand:       gofakeit.Name(),
+				Status:      uint8(gofakeit.HTTPStatusCode()),
+			},
 		},
 		Locale:            gofakeit.Language(),
 		InternalSignature: "",
@@ -115,7 +134,3 @@ func RandomOrder(uuid string) *Order {
 		OofShard:          "1",
 	}
 }
-
-//type Items struct {
-//	ItemsArr []Item
-//}
