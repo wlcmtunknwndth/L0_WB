@@ -13,7 +13,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"time"
 )
 
 type Database interface {
@@ -138,7 +137,9 @@ func main() {
 			slog.Error("couldn't unmarshall search request: ", err)
 			return
 		}
-		sub, err := sc.OrderGetter(searchReq.Uuid, w)
+
+		ch := make(chan bool)
+		sub, err := sc.OrderGetter(searchReq.Uuid, w, &ch)
 		defer func(sub stan.Subscription) {
 			if err := sub.Close(); err != nil {
 				slog.Error("couldn't close connection: ", err)
@@ -146,7 +147,7 @@ func main() {
 			}
 		}(sub)
 		if err != nil {
-			slog.Error("couldn't run reciever: ", err)
+			slog.Error("couldn't run receiver: ", err)
 			return
 		}
 
@@ -155,7 +156,7 @@ func main() {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		time.Sleep(1 * time.Second)
+		<-ch
 	})
 
 	srv := &http.Server{

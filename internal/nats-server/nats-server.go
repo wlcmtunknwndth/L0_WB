@@ -106,7 +106,7 @@ func (b *Broker) GetHandler() (stan.Subscription, error) {
 	return sub, nil
 }
 
-func (b *Broker) OrderGetter(uuid string, w http.ResponseWriter) (stan.Subscription, error) {
+func (b *Broker) OrderGetter(uuid string, w http.ResponseWriter, ch *chan bool) (stan.Subscription, error) {
 	sub, err := b.sc.Subscribe(uuid, func(m *stan.Msg) {
 		var order storage.Order
 		if err := json.Unmarshal(m.Data, &order); err != nil {
@@ -118,6 +118,7 @@ func (b *Broker) OrderGetter(uuid string, w http.ResponseWriter) (stan.Subscript
 			slog.Error("couldn't write respond")
 			return
 		}
+		*ch <- true
 	})
 	if err != nil {
 		slog.Error("couldn't run order getter: ", err)
