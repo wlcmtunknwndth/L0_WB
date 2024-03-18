@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/nats-io/stan.go"
+	"github.com/wlcmtunknwndth/L0_WB/internal/cacher"
 	"github.com/wlcmtunknwndth/L0_WB/internal/config"
 	nats_server "github.com/wlcmtunknwndth/L0_WB/internal/nats-server"
 	"github.com/wlcmtunknwndth/L0_WB/internal/storage"
@@ -13,6 +14,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 type Database interface {
@@ -35,14 +37,9 @@ func main() {
 		}
 	}(db)
 
-	//order, err := db.GetOrder("b563feb7b2b84b6test")
-	//if err != nil {
-	//	slog.Error("couldn't get order: ", err)
-	//	return
-	//}
-	//fmt.Printf("%+v", order)
-
 	sc := nats_server.New(cfg, db)
+
+	cach := cacher.New(db, 5*time.Minute, 10*time.Minute)
 
 	saverSub, err := sc.Saver()
 	defer func(sub stan.Subscription) {
@@ -90,6 +87,13 @@ func main() {
 			return
 		}
 
+		//cache
+		var order storage.Order
+		if err = json.Unmarshal(body, &order); err != nil {
+			slog.Error("couldn't unmarshall order: ", err)
+		}
+		cach.CacheOrder(order)
+
 		if err = sc.PublishOrder(body); err != nil {
 			slog.Error("couldn't publish order: ", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -105,12 +109,16 @@ func main() {
 	router.Post("/save_random", func(w http.ResponseWriter, r *http.Request) {
 		uuid := gofakeit.UUID()
 
-		orderBytes, err := json.Marshal(storage.RandomOrder(uuid))
+		order := storage.RandomOrder(uuid)
+		orderBytes, err := json.Marshal(order)
 		if err != nil {
 			slog.Error("couldn't encode random order: ", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
+		//cache
+		cach.CacheOrder(*order)
 
 		if err = sc.PublishOrder(orderBytes); err != nil {
 			slog.Error("couldn't publish order: ", err)
@@ -132,14 +140,31 @@ func main() {
 			slog.Error("couldn't get body: ", err)
 			return
 		}
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}(r.Body)
+
 		var searchReq storage.SearchRequest
 		if err = json.Unmarshal(req, &searchReq); err != nil {
 			slog.Error("couldn't unmarshall search request: ", err)
 			return
 		}
 
+		if order, found := cach.GetOrder(searchReq.Uuid); found {
+			err = SendOrderAsJson(order, w)
+			if err != nil {
+				slog.Error("couldn't send cached back: ", err)
+			} else {
+				slog.Info("sent cached order")
+			}
+		}
+
 		ch := make(chan bool)
-		sub, err := sc.OrderGetter(searchReq.Uuid, w, &ch)
+		sub, err := sc.OrderGetter(searchReq.Uuid, w, &ch, cach)
 		defer func(sub stan.Subscription) {
 			if err := sub.Close(); err != nil {
 				slog.Error("couldn't close connection: ", err)
@@ -171,4 +196,18 @@ func main() {
 		slog.Error("failed to start server")
 	}
 	slog.Error("application finished")
+}
+
+func SendOrderAsJson(order *storage.Order, w http.ResponseWriter) error {
+	answer, err := json.Marshal(*order)
+	if err != nil {
+		slog.Error("couldn't marshal order: ", err)
+		return err
+	}
+
+	if _, err = w.Write(answer); err != nil {
+		slog.Error("couldn't send answer: ", err)
+		return err
+	}
+	return nil
 }

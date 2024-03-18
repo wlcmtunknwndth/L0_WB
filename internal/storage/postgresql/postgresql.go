@@ -37,6 +37,34 @@ func (s *Storage) Ping() error {
 	return s.db.Ping()
 }
 
+func (s *Storage) Delete(uuid, trackNum string) error {
+	_, err := s.db.Exec(deleteItems, trackNum)
+	if err != nil {
+		slog.Error("couldn't delete order", err)
+		return err
+	}
+
+	_, err = s.db.Exec(deleteDelivery, trackNum)
+	if err != nil {
+		slog.Error("couldn't delete order", err)
+		return err
+	}
+
+	_, err = s.db.Exec(deletePayment, uuid)
+	if err != nil {
+		slog.Error("couldn't delete order", err)
+		return err
+	}
+
+	_, err = s.db.Exec(deleteOrder, uuid)
+	if err != nil {
+		slog.Error("couldn't delete order", err)
+		return err
+	}
+
+	return nil
+}
+
 func (s *Storage) GetOrder(orderUid string) (*storage.Order, error) {
 	const op = "storage.postrgesql.getOrder"
 	result := s.db.QueryRow(getOrderTemplate, orderUid)
@@ -59,7 +87,7 @@ func (s *Storage) GetOrder(orderUid string) (*storage.Order, error) {
 }
 
 func (s *Storage) SaveOrder(order *storage.Order) error {
-	const op = "storage.postgresql.CreateOrder"
+	const op = "storage.postgresql.SaveOrder"
 
 	_, err := s.db.Exec(saveOrder,
 		order.OrderID, order.TrackNum, order.Entry, order.Locale,
@@ -148,4 +176,50 @@ func ParseItems(row *sql.Rows) *[]storage.Item {
 	}
 
 	return &items
+}
+
+func (s *Storage) DeleteCache(uuid string) error {
+	_, err := s.db.Exec(deleteCache, uuid)
+	if err != nil {
+		slog.Error("couldn't delete from cached: ", err)
+	}
+	return err
+}
+
+func (s *Storage) SaveCache(uuid string) error {
+	_, err := s.db.Exec(saveCache, uuid)
+	if err != nil {
+		slog.Error("couldn't save cache: ", err)
+		return err
+	}
+	return nil
+}
+
+func (s *Storage) RestoreCache() (*[]storage.Order, error) {
+	rows, err := s.db.Query(getCache)
+	if err != nil {
+		slog.Error("couldn't query restoring cache: ", err)
+		return nil, err
+	}
+	uuids := make([]string, 0)
+	var tmp string
+	for rows.Next() {
+		err = rows.Scan(&tmp)
+		if err != nil {
+			slog.Error("couldn't get all the uuids from cache: ", err)
+			break
+		}
+		uuids = append(uuids, tmp)
+	}
+
+	orders := make([]storage.Order, 0)
+	for _, value := range uuids {
+		order, err := s.GetOrder(value)
+		if err != nil {
+			slog.Error("couldn't get order: ", value, err)
+			break
+		}
+		orders = append(orders, *order)
+	}
+	return &orders, nil
 }

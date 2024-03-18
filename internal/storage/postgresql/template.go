@@ -96,4 +96,27 @@ INSERT INTO items VALUES (
 	$11
 );
 `
+
+	deletePayment = `
+DELETE FROM payment WHERE transact = $1;
+`
+	deleteItems = ` 
+DELETE FROM items WHERE track_number = $1;
+`
+	deleteDelivery = `
+DELETE FROM delivery WHERE track_number = $1;
+`
+	deleteOrder = `
+DELETE FROM orders WHERE order_uid = $1;
+`
+
+	deleteCache = `
+DELETE FROM cached WHERE order_uid = $1
+`
+	saveCache = `
+INSERT INTO cached VALUES($1)
+`
+	getCache = `
+SELECT * FROM cached
+`
 )

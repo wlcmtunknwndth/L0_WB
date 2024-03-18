@@ -3,6 +3,7 @@ package nats_server
 import (
 	"encoding/json"
 	"github.com/nats-io/stan.go"
+	"github.com/wlcmtunknwndth/L0_WB/internal/cacher"
 	"github.com/wlcmtunknwndth/L0_WB/internal/config"
 	"github.com/wlcmtunknwndth/L0_WB/internal/storage"
 	"log/slog"
@@ -106,13 +107,14 @@ func (b *Broker) GetHandler() (stan.Subscription, error) {
 	return sub, nil
 }
 
-func (b *Broker) OrderGetter(uuid string, w http.ResponseWriter, ch *chan bool) (stan.Subscription, error) {
+func (b *Broker) OrderGetter(uuid string, w http.ResponseWriter, ch *chan bool, c *cacher.Cacher) (stan.Subscription, error) {
 	sub, err := b.sc.Subscribe(uuid, func(m *stan.Msg) {
 		var order storage.Order
 		if err := json.Unmarshal(m.Data, &order); err != nil {
 			slog.Error("couldn't unmarshal message: ", err)
 			return
 		}
+		c.CacheOrder(order)
 
 		if _, err := w.Write(m.Data); err != nil {
 			slog.Error("couldn't write respond")
