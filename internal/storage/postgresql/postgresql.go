@@ -14,6 +14,7 @@ type Storage struct {
 	db *sql.DB
 }
 
+// New -- creates new instance of storage.Storage.
 func New(config config.DbConfig) (*Storage, error) {
 	const op = "storage.postgresql.New"
 	connStr := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", config.DbUser, config.DbPass, config.DbName, config.SSLmode)
@@ -38,6 +39,7 @@ func (s *Storage) Ping() error {
 	return s.db.Ping()
 }
 
+// Delete -- deletes storage.Order from storage.
 func (s *Storage) Delete(uuid, trackNum string) error {
 	_, err := s.db.Exec(deleteItems, trackNum)
 	if err != nil {
@@ -66,6 +68,7 @@ func (s *Storage) Delete(uuid, trackNum string) error {
 	return nil
 }
 
+// GetOrder -- sends storage.Order by given uid if exists.
 func (s *Storage) GetOrder(orderUid string) (*storage.Order, error) {
 	const op = "storage.postrgesql.getOrder"
 	result := s.db.QueryRow(getOrderTemplate, orderUid)
@@ -87,6 +90,7 @@ func (s *Storage) GetOrder(orderUid string) (*storage.Order, error) {
 	return order, nil
 }
 
+// SaveOrder -- saves the given order to the storage.
 func (s *Storage) SaveOrder(order *storage.Order) error {
 	const op = "storage.postgresql.SaveOrder"
 
@@ -134,6 +138,7 @@ func (s *Storage) SaveOrder(order *storage.Order) error {
 
 }
 
+// ParseOrder -- parses sql.Row to storage.Order.
 func ParseOrder(row *sql.Row) (*storage.Order, error) {
 	var order storage.Order
 	err := row.Scan( // Common order Info
@@ -160,6 +165,7 @@ func ParseOrder(row *sql.Row) (*storage.Order, error) {
 	return &order, nil
 }
 
+// ParseItems -- parses sql.Row from storage to []storage.Item.
 func ParseItems(row *sql.Rows) *[]storage.Item {
 	var items []storage.Item = make([]storage.Item, 0)
 
@@ -179,6 +185,7 @@ func ParseItems(row *sql.Rows) *[]storage.Item {
 	return &items
 }
 
+// DeleteCache -- deletes cached uuid from storage.
 func (s *Storage) DeleteCache(uuid string) error {
 	_, err := s.db.Exec(deleteCache, uuid)
 	if err != nil {
@@ -187,6 +194,7 @@ func (s *Storage) DeleteCache(uuid string) error {
 	return err
 }
 
+// SaveCache -- saves cache to the storage.
 func (s *Storage) SaveCache(uuid string) error {
 	_, err := s.db.Exec(saveCache, uuid)
 	if err != nil {
@@ -196,6 +204,7 @@ func (s *Storage) SaveCache(uuid string) error {
 	return nil
 }
 
+// IsAlreadyCached -- checks if uuid cache has already been saved to the storage.
 func (s *Storage) IsAlreadyCached(uuid string) bool {
 	var uuidRow string
 	if err := s.db.QueryRow(isAlreadyCached, uuid).Scan(&uuidRow); err != nil {
@@ -208,6 +217,7 @@ func (s *Storage) IsAlreadyCached(uuid string) bool {
 	return true
 }
 
+// RestoreCache -- returns []storage.Order by backupED uuids in the storage.
 func (s *Storage) RestoreCache() (*[]storage.Order, error) {
 	rows, err := s.db.Query(getCache)
 	if err != nil {

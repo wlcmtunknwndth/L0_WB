@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// cached -- is the map with saved uuids in current run, so it is easier to back up
 var cached = make(map[string]struct{})
 
 type Storage interface {
@@ -21,6 +22,8 @@ type Cacher struct {
 	db      Storage
 }
 
+// New -- creates new instance of Cacher with Storage interface and cache.Cache vars. expTime -- is the standard expiration time of cached item.
+// purgeTime -- is the time the cacher cleans up itself
 func New(db Storage, expTime time.Duration, purgeTime time.Duration) *Cacher {
 	return &Cacher{
 		handler: cache.New(expTime, purgeTime),
@@ -28,6 +31,7 @@ func New(db Storage, expTime time.Duration, purgeTime time.Duration) *Cacher {
 	}
 }
 
+// CacheOrder -- caches the order given as an arg and maps order's uuid to cache map.
 func (c *Cacher) CacheOrder(order storage.Order) {
 	c.handler.OnEvicted(c.onEvicted)
 	c.handler.Set(order.OrderID, order, cache.DefaultExpiration)
@@ -38,6 +42,7 @@ func (c *Cacher) CacheOrder(order storage.Order) {
 	cached[order.OrderID] = struct{}{}
 }
 
+// onEvicted -- is a custom func, handling cached item after expiration. It deletes item from cache map and deletes uuid from storage Cache backup.
 func (c *Cacher) onEvicted(uuid string, data interface{}) {
 	delete(cached, uuid)
 	err := c.db.DeleteCache(uuid)
@@ -46,6 +51,7 @@ func (c *Cacher) onEvicted(uuid string, data interface{}) {
 	}
 }
 
+// GetOrder -- gets order from cache if found
 func (c *Cacher) GetOrder(uuid string) (*storage.Order, bool) {
 	data, found := c.handler.Get(uuid)
 	if found {
@@ -55,10 +61,7 @@ func (c *Cacher) GetOrder(uuid string) (*storage.Order, bool) {
 	return nil, false
 }
 
-//func (c *Cacher) IsSaved(uuid string) bool {
-//
-//}
-
+// Restore -- restores cached item from backup copy in storage. Must be used at the start of ur application.
 func (c *Cacher) Restore() error {
 	orders, err := c.db.RestoreCache()
 	//fmt.Println(orders)
@@ -73,6 +76,7 @@ func (c *Cacher) Restore() error {
 	return nil
 }
 
+// SaveCache -- backups cache to the storage
 func (c *Cacher) SaveCache() error {
 	var err error
 	for key := range cached {

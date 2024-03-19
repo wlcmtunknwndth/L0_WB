@@ -40,12 +40,16 @@ func main() {
 	sc := natsServer.New(cfg, db)
 
 	cach := cacher.New(db, 1*time.Minute, 3*time.Minute)
+
+	// Restoring cache
 	err = cach.Restore()
 	if err = cach.Restore(); err != nil {
 		slog.Error("couldn't restore cache: ", err)
 	} else {
 		slog.Info("cache successfully restored")
 	}
+
+	// Goroutine for cacher.SaveCache which backups cache every chosen time
 	ticker := time.NewTicker(20 * time.Second)
 	quit := make(chan struct{})
 	go func() {
@@ -71,6 +75,7 @@ func main() {
 	//	}
 	//}(cach)
 
+	// Run Saver() subscription
 	saverSub, err := sc.Saver()
 	defer func(sub stan.Subscription) {
 		if err := sub.Close(); err != nil {
@@ -83,6 +88,7 @@ func main() {
 		return
 	}
 
+	// Run GetHandler() subscription
 	getterSub, err := sc.GetHandler()
 	if err != nil {
 		slog.Error("couldn't start get handler: ", err)
@@ -96,11 +102,12 @@ func main() {
 	}(getterSub)
 
 	router := chi.NewRouter()
-	router.Use(middleware.RequestID)
+	router.Use(middleware.RequestID) // adds requestID to logs
 	router.Use(middleware.Recoverer)
-	router.Use(middleware.URLFormat)
+	router.Use(middleware.URLFormat) // adds request format
 	router.Use(middleware.Logger)
 
+	// Gets the post request with storage.Order in body
 	router.Post("/save", func(w http.ResponseWriter, r *http.Request) {
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
@@ -110,6 +117,7 @@ func main() {
 			}
 		}(r.Body)
 
+		// getting body
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			slog.Error("error decoding request: ", err)
@@ -117,25 +125,29 @@ func main() {
 			return
 		}
 
-		//cache
+		//caching new order
 		var order storage.Order
 		if err = json.Unmarshal(body, &order); err != nil {
 			slog.Error("couldn't unmarshall order: ", err)
 		}
 		cach.CacheOrder(order)
 
+		// publishing order to streaming channel with SaveOrder message(command)
 		if err = sc.PublishOrder(body); err != nil {
 			slog.Error("couldn't publish order: ", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
+		// Writing response
 		if _, err = w.Write([]byte("saved")); err != nil {
 			slog.Error("couldn't write body: ", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	})
+
+	//Gets the body of save_random post request(must be empty) and creates a random order, which it saves in the storage and writes back to usr order's uuid
 	router.Post("/save_random", func(w http.ResponseWriter, r *http.Request) {
 		uuid := gofakeit.UUID()
 
@@ -150,12 +162,14 @@ func main() {
 		//cache
 		cach.CacheOrder(*order)
 
+		// publishing order to Saver handler with SaveOrder message
 		if err = sc.PublishOrder(orderBytes); err != nil {
 			slog.Error("couldn't publish order: ", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
+		// writes uuid of a randomly created order
 		if _, err = w.Write([]byte(uuid)); err != nil {
 			slog.Error("Couldn't write head")
 			w.WriteHeader(http.StatusInternalServerError)
@@ -178,12 +192,14 @@ func main() {
 			}
 		}(r.Body)
 
+		// unmarshalling uuid in request body
 		var searchReq storage.SearchRequest
 		if err = json.Unmarshal(req, &searchReq); err != nil {
 			slog.Error("couldn't unmarshall search request: ", err)
 			return
 		}
 
+		// gets the order from storage by uuid in request
 		if order, found := cach.GetOrder(searchReq.Uuid); found {
 			err = SendOrderAsJson(order, w)
 			if err != nil {
@@ -193,7 +209,10 @@ func main() {
 			}
 		}
 
+		// create a channel, waiting for OrderGetter subscription to get the data from GetHandler
 		ch := make(chan bool)
+
+		// run a subscription waiting for message with uuid from body with the needed order as the data
 		sub, err := sc.OrderGetter(searchReq.Uuid, w, &ch, cach)
 		if err != nil {
 			slog.Error("couldn't run receiver: ", err)
@@ -206,11 +225,14 @@ func main() {
 			}
 		}(sub)
 
+		// publishing uuid from user's body. UUID must be published for GetHandler only after OrderGetter was started.
 		if err = sc.PublishUUID([]byte(searchReq.Uuid)); err != nil {
 			slog.Error("couldn't publish uuid: ", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
+		// channel waits for OrderGetter to get and write message
 		<-ch
 	})
 
@@ -228,6 +250,7 @@ func main() {
 	//slog.Error("application finished")
 }
 
+// SendOrderAsJson  -- sends storage.Order instance to the http.ResponseWriter response body.
 func SendOrderAsJson(order *storage.Order, w http.ResponseWriter) error {
 	answer, err := json.Marshal(*order)
 	if err != nil {

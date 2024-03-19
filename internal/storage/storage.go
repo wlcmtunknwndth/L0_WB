@@ -59,6 +59,7 @@ type Item struct {
 	Status      uint8  `json:"status"`
 }
 
+// SearchRequest -- needed for unmarshaling to search for the storage.Order in the backend by sent uuid.
 type SearchRequest struct {
 	Uuid string `json:"order_uid"`
 }
@@ -66,6 +67,7 @@ type SearchRequest struct {
 var banks = []string{"sber", "alpha", "raif", "tinkoff", "wtb", "rnkb"}
 var currency = []string{"USD", "RUB", "GBP", "EUR", "GRN", "IDK"}
 
+// RandomOrder -- creates order with random fields.
 func RandomOrder(uuid string) *Order {
 	address := gofakeit.Address()
 	//uuid := gofakeit.UUID()

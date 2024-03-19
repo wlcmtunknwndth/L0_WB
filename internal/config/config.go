@@ -33,6 +33,7 @@ type Nats struct {
 
 const op = "config.MustLoad: "
 
+// MustLoad -- looks for the config by CONFIG_PATH .env variable and marshals .yaml config to Config. Your project must contain local.env file with CONFIG_PATH variable.
 func MustLoad() *Config {
 	if err := godotenv.Load("local.env"); err != nil {
 		slog.Error(op, err)

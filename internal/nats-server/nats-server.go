@@ -20,6 +20,8 @@ type Broker struct {
 	db *Storage
 }
 
+// New -- creates a new instance of our Broker, which is needed stan.Conn and storage with methods SaveOrder(order *storage.Order) error and
+// GetOrder(uuid string) (*storage.Order, error).
 func New(cfg *config.Config, db Storage) *Broker {
 	sc, err := stan.Connect(
 		"test-cluster",
@@ -39,6 +41,7 @@ const (
 	SaveOrder = "saveOrder"
 )
 
+// Saver -- saves orders got from streaming channel with the SaveMessage message.
 func (b *Broker) Saver() (stan.Subscription, error) {
 	sub, err := b.sc.Subscribe(SaveOrder, func(m *stan.Msg) {
 		var order storage.Order
@@ -61,6 +64,7 @@ func (b *Broker) Saver() (stan.Subscription, error) {
 	return sub, nil
 }
 
+// PublishOrder -- publishes order in []byte form with the SaveOrder message, which is listened by Saver.
 func (b *Broker) PublishOrder(order []byte) error {
 	err := b.sc.Publish(SaveOrder, order)
 	if err != nil {
@@ -70,6 +74,8 @@ func (b *Broker) PublishOrder(order []byte) error {
 	return nil
 }
 
+// PublishUUID -- publishes uuid(must be string) in []byte form to the streaming channel with the SendOrder message, so the GetHandler gets the uuid it must
+// look for in storage and send back.
 func (b *Broker) PublishUUID(uuid []byte) error {
 	err := b.sc.Publish(SendOrder, uuid)
 	if err != nil {
@@ -79,6 +85,8 @@ func (b *Broker) PublishUUID(uuid []byte) error {
 	return nil
 }
 
+// GetHandler -- opens subscription to get request. When message is sent, gets the storage.Order from storage.Storage instance with chosen uuid and sends
+// it back to streaming channel with uuid of the instance as message, so the other subscription must wait for the message with uuid the user sent.
 func (b *Broker) GetHandler() (stan.Subscription, error) {
 	sub, err := b.sc.Subscribe(SendOrder, func(m *stan.Msg) {
 		var uuid = string(m.Data)
@@ -107,6 +115,9 @@ func (b *Broker) GetHandler() (stan.Subscription, error) {
 	return sub, nil
 }
 
+// OrderGetter -- gets order from GetHandler and writes it to our http.ResponseWriter. It func opens subscription by uuid as the name
+// and waits for order sent back by GetHandler in []byte, then unmarshals it and write to user response body. Channel are used to verify if data has been sent,
+// otherwise the response won't be sent. Returns stan.Subscription to close it later in router(handler).
 func (b *Broker) OrderGetter(uuid string, w http.ResponseWriter, ch *chan bool, c *cacher.Cacher) (stan.Subscription, error) {
 	sub, err := b.sc.Subscribe(uuid, func(m *stan.Msg) {
 		var order storage.Order
