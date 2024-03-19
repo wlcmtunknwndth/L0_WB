@@ -113,10 +113,7 @@ DELETE FROM orders WHERE order_uid = $1;
 	deleteCache = `
 DELETE FROM cached WHERE order_uid = $1
 `
-	saveCache = `
-INSERT INTO cached VALUES($1)
-`
-	getCache = `
-SELECT * FROM cached
-`
+	saveCache       = `INSERT INTO cached VALUES($1)`
+	getCache        = `SELECT * FROM cached`
+	isAlreadyCached = `SELECT * FROM cached WHERE order_uid = $1`
 )

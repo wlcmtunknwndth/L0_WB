@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
 	"github.com/wlcmtunknwndth/L0_WB/internal/config"
@@ -189,10 +190,22 @@ func (s *Storage) DeleteCache(uuid string) error {
 func (s *Storage) SaveCache(uuid string) error {
 	_, err := s.db.Exec(saveCache, uuid)
 	if err != nil {
-		slog.Error("couldn't save cache: ", err)
+		//slog.Error("couldn't save cache: ", err)
 		return err
 	}
 	return nil
+}
+
+func (s *Storage) IsAlreadyCached(uuid string) bool {
+	var uuidRow string
+	if err := s.db.QueryRow(isAlreadyCached, uuid).Scan(&uuidRow); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false
+		}
+		slog.Error("couldn't check if order is cached")
+		return false
+	}
+	return true
 }
 
 func (s *Storage) RestoreCache() (*[]storage.Order, error) {
@@ -201,13 +214,20 @@ func (s *Storage) RestoreCache() (*[]storage.Order, error) {
 		slog.Error("couldn't query restoring cache: ", err)
 		return nil, err
 	}
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			slog.Error("couldn't close rows")
+		}
+	}(rows)
 	uuids := make([]string, 0)
-	var tmp string
+
 	for rows.Next() {
+		var tmp string
 		err = rows.Scan(&tmp)
 		if err != nil {
 			slog.Error("couldn't get all the uuids from cache: ", err)
-			break
+			continue
 		}
 		uuids = append(uuids, tmp)
 	}
@@ -221,5 +241,5 @@ func (s *Storage) RestoreCache() (*[]storage.Order, error) {
 		}
 		orders = append(orders, *order)
 	}
-	return &orders, nil
+	return &orders, err
 }

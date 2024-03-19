@@ -8,7 +8,7 @@ import (
 	"github.com/nats-io/stan.go"
 	"github.com/wlcmtunknwndth/L0_WB/internal/cacher"
 	"github.com/wlcmtunknwndth/L0_WB/internal/config"
-	nats_server "github.com/wlcmtunknwndth/L0_WB/internal/nats-server"
+	natsServer "github.com/wlcmtunknwndth/L0_WB/internal/nats-server"
 	"github.com/wlcmtunknwndth/L0_WB/internal/storage"
 	"github.com/wlcmtunknwndth/L0_WB/internal/storage/postgresql"
 	"io"
@@ -37,9 +37,39 @@ func main() {
 		}
 	}(db)
 
-	sc := nats_server.New(cfg, db)
+	sc := natsServer.New(cfg, db)
 
-	cach := cacher.New(db, 5*time.Minute, 10*time.Minute)
+	cach := cacher.New(db, 1*time.Minute, 3*time.Minute)
+	err = cach.Restore()
+	if err = cach.Restore(); err != nil {
+		slog.Error("couldn't restore cache: ", err)
+	} else {
+		slog.Info("cache successfully restored")
+	}
+	ticker := time.NewTicker(20 * time.Second)
+	quit := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := cach.SaveCache(); err != nil {
+					continue
+				}
+				slog.Info("made a cache backup")
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+	defer close(quit)
+
+	//defer func(cach *cacher.Cacher) {
+	//	err := cach.SaveCache()
+	//	if err != nil {
+	//		slog.Error("couldn't backup cache: ", err)
+	//	}
+	//}(cach)
 
 	saverSub, err := sc.Saver()
 	defer func(sub stan.Subscription) {
@@ -165,16 +195,16 @@ func main() {
 
 		ch := make(chan bool)
 		sub, err := sc.OrderGetter(searchReq.Uuid, w, &ch, cach)
+		if err != nil {
+			slog.Error("couldn't run receiver: ", err)
+			return
+		}
 		defer func(sub stan.Subscription) {
 			if err := sub.Close(); err != nil {
 				slog.Error("couldn't close connection: ", err)
 				return
 			}
 		}(sub)
-		if err != nil {
-			slog.Error("couldn't run receiver: ", err)
-			return
-		}
 
 		if err = sc.PublishUUID([]byte(searchReq.Uuid)); err != nil {
 			slog.Error("couldn't publish uuid: ", err)
@@ -195,7 +225,7 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil {
 		slog.Error("failed to start server")
 	}
-	slog.Error("application finished")
+	//slog.Error("application finished")
 }
 
 func SendOrderAsJson(order *storage.Order, w http.ResponseWriter) error {
