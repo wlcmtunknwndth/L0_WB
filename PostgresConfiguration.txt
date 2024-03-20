@@ -1,0 +1,259 @@
+DROP TABLE orders, delivery, payment, items;
+
+INSERT INTO orders(
+	order_uid,
+	track_number,
+	entry,
+	locale,
+	internal_signature,
+	customer_id,
+	delivery_service,
+	shardkey,
+	sm_id,
+	date_created,
+	oof_shard
+)
+VALUES (
+	'b563feb7b2b84b6test',
+	'WBILMTESTTRACK',
+	'WBIL',
+	'en',
+	'',
+	'test',
+	'meest',
+	'9',
+	99,
+	'2021-11-26 06:22:19',
+	'1'
+);
+
+INSERT INTO delivery(
+ 	track_number,
+	fio,
+	phone,
+	zip,
+	city,
+	address,
+	region,
+	email
+) 
+VALUES (
+	'WBILMTESTTRACK',
+	'Test Testov',
+	'+98200000000',
+	'2639809',
+	'Kiryat Mozkin',
+	'Ploshad Mira 15',
+	'Kraiot',
+	'dsfse@mail.ru'
+);
+
+INSERT INTO payment VALUES (
+	'b563feb7b2b84b6test',
+	'',
+	'USD',
+	'wbpay',
+	1817,
+	1637907727,
+	'alpha',
+	1500,
+	317,
+	1
+);
+
+INSERT INTO items VALUES (
+	9934930,
+	'WBILMTESTTRACK',
+	453,
+	'ab4219087a764ae0btest',
+	'Mascaras',
+	30,
+	'0',
+	317,
+	2389212,
+	'Vivienne Sabo',
+	202
+);
+
+
+SELECT * 
+FROM orders 
+FULL OUTER JOIN delivery ON orders.delivery = delivery.uid
+FULL OUTER JOIN payment ON orders.order_uid = payment.transact
+FULL OUTER JOIN items ON orders.track_number = items.track_number
+
+DELETE FROM delivery;
+DELETE FROM payment;
+DELETE FROM items;
+DELETE FROM orders;
+
+SELECT o.order_uid, o.track_number, o.entry, o.locale, o.internal_signature, 
+	o.customer_id, o.delivery_service, o.shardkey, o.sm_id, 
+	o.date_created, o.oof_shard, 
+	d.fio, d.phone, d.zip, d.city, d.address, d.region, d.email,
+	pa.request_id, pa.currency, pa.provider, pa.amount, pa.payment_dt, pa.bank,
+	pa.delivery_cost, pa.goods_total, pa.custom_fee,
+	i.chrt_id, i.price, i.rid, i.iname, i.sale, i.isize, i.total_price, i.nm_id,
+	i.brand, i.status
+	FROM orders o  
+JOIN delivery d ON o.track_number = d.track_number
+JOIN payment pa ON o.order_uid = pa.transact
+JOIN items i ON o.track_number = i.track_number
+
+
+
+_, err := s.db.Exec(saveTemplate,
+		order.OrderID, order.TrackNum, order.Entry, order.Locale,
+		order.InternalSignature, order.CustomerId, order.DeliveryService,
+		order.Shardkey, order.SmId, order.DateCreated, order.OofShard,
+		order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
+		order.Delivery.City, order.Delivery.Address, order.Delivery.Region,
+		order.Delivery.Email,
+		order.Payment.Transaction, order.Payment.ReqID, order.Payment.Currency,
+		order.Payment.Provider, order.Payment.Amount, order.Payment.PaymentDt,
+		order.Payment.Bank, order.Payment.DeliveryCost, order.Payment.GoodsTotal,
+		order.Payment.CustomFee,
+		order.Items.ChrtID, order.Items.TrackNumber, order.Items.Price,
+		order.Items.Rid, order.Items.Name, order.Items.Sale, order.Items.Size,
+		order.Items.TotalPrice, order.Items.NmID, order.Items.Brand,
+		order.Items.Status,
+	)
+
+
+.\nats-streaming-server.exe -p 4040
+
+
+CREATE TABLE IF NOT EXISTS orders 
+(
+    order_uid  VARCHAR(64) PRIMARY KEY,
+    track_number  VARCHAR(64) UNIQUE,
+    entry  VARCHAR(64),
+    locale  VARCHAR(10),
+    internal_signature  VARCHAR(64),
+    customer_id  VARCHAR(64),
+    delivery_service  VARCHAR(64),
+    shardkey VARCHAR(64),
+    sm_id  BIGINT,
+    date_created  timestamp,
+    oof_shard  VARCHAR(32)
+);
+
+CREATE TABLE IF NOT EXISTS delivery 
+(
+	track_number VARCHAR(64)  PRIMARY KEY,
+	fio VARCHAR(64),
+	phone VARCHAR(16),
+	zip VARCHAR(16),
+	city VARCHAR(32),
+	address VARCHAR(64),
+	region VARCHAR(32),
+	email VARCHAR(64),
+	FOREIGN KEY (track_number) REFERENCES orders(track_number)
+);
+
+CREATE TABLE IF NOT EXISTS payment
+(
+	transact VARCHAR(64) UNIQUE,
+	request_id VARCHAR(64),
+	currency VARCHAR(8),
+	provider VARCHAR(32),
+	amount BIGINT CHECK(delivery_cost >= 0),
+	payment_dt BIGINT CHECK(payment_dt > 0),
+	bank VARCHAR(32),
+	delivery_cost INT CHECK(delivery_cost > 0),	
+	goods_total BIGINT CHECK(goods_total > 0),
+	custom_fee SMALLINT CHECK(custom_fee >= 0),
+	FOREIGN KEY (transact) REFERENCES orders(order_uid)
+);
+
+CREATE TABLE IF NOT EXISTS items
+(
+	chrt_id BIGINT PRIMARY KEY,
+	track_number VARCHAR(128),  
+	price BIGINT,
+	rid VARCHAR(64) UNIQUE,
+	iname VARCHAR(32),
+	sale SMALLINT CHECK (sale >= 0),
+	isize VARCHAR(16),
+	total_price INT CHECK (total_price > 0),
+	nm_id INT CHECK (nm_id > 0),
+	brand VARCHAR(32),
+	status INT CHECK (status >= 0),
+	FOREIGN KEY (track_number) REFERENCES orders(track_number)
+);
+
+
+SELECT * FROM items WHERE track_number = 'WBILMTESTTRACK'
+
+
+{
+  "order_uid": "b563feb7b2b8test",
+  "track_number": "WBILMTESTTRACK1",
+  "entry": "WBIL",
+  "delivery": {
+    "name": "Test Testov",
+    "phone": "+9720000000",
+    "zip": "2639809",
+    "city": "Kiryat Mozkin",
+    "address": "Ploshad Mira 15",
+    "region": "Kraiot",
+    "email": "test@gmail.com"
+  },
+  "payment": {
+    "transaction": "b563feb7b2b8test",
+    "request_id": "",
+    "currency": "USD",
+    "provider": "wbpay",
+    "amount": 1817,
+    "payment_dt": 37907727,
+    "bank": "sber",
+    "delivery_cost": 1500,
+    "goods_total": 317,
+    "custom_fee": 0
+  },
+  "items": [{
+    "chrt_id": 99349,
+    "track_number": "WBILMTESTTRACK1",
+    "price": 453,
+    "rid": "ab4219087a764aetest",
+    "name": "Mascaras",
+    "sale": 30,
+    "size": "0",
+    "total_price": 317,
+    "nm_id": 238921,
+    "brand": "Vivienne Sabo",
+    "status": 202
+  },
+  {
+    "chrt_id": 993491,
+    "track_number": "WBILMTESTTRACK1",
+    "price": 453,
+    "rid": "ab4219087a764aetest1",
+    "name": "Mascaras1",
+    "sale": 30,
+    "size": "0",
+    "total_price": 317,
+    "nm_id": 2389211,
+    "brand": "Vivienne Sabo1",
+    "status": 203
+  }
+  ],
+  "locale": "en",
+  "internal_signature": "",
+  "customer_id": "test",
+  "delivery_service": "meest",
+  "shardkey": "9",
+  "sm_id": 98,
+  "date_created": "2021-11-26T06:22:19Z",
+  "oof_shard": "1"
+}
+
+CREATE TABLE IF NOT EXISTS cached(
+	order_uid VARCHAR(64) PRIMARY KEY
+) 
+
+DELETE FROM payment WHERE transact = '12313121';
+DELETE FROM items WHERE track_number = '4';
+DELETE FROM delivery WHERE track_number = '4';
+DELETE FROM orders WHERE order_uid = '12313121';
+"12313121"	"4"	"WBIL2"	"en"		"test"	"meest"	"9"	98	"2021-11-26 06:22:19"	"1"
