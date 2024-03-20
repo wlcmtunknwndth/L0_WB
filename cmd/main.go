@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// Goroutine for cacher.SaveCache which backups cache every chosen time
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(5 * time.Minute)
 	quit := make(chan struct{})
 	go func() {
 		for {
